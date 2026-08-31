@@ -85,24 +85,47 @@ export function ProfileView() {
   if (status === "loading") return <div>Loading…</div>;
   if (status === "error") return <div>Something went wrong loading your profile.</div>;
 
+  const fieldStyle = {
+    border: "var(--portal-border-width, 1px) solid var(--portal-color-border, #ddd)",
+    borderRadius: "var(--portal-radius, 6px)",
+    padding: "var(--portal-space-2, 0.5rem)",
+  };
+
   return (
-    <div>
-      <h1>{me?.displayName ?? me?.email ?? "Your profile"}</h1>
-      {saveError && <p>Could not save your changes. Please try again.</p>}
+    <div className="portal-flex portal-flex-col portal-gap-4">
+      <h1 style={{ color: "var(--portal-color-text, #1a1a1a)" }}>
+        {me?.displayName ?? me?.email ?? "Your profile"}
+      </h1>
+      {saveError && (
+        <p style={{ color: "var(--portal-color-danger, #b91c1c)" }}>
+          Could not save your changes. Please try again.
+        </p>
+      )}
       <form
+        className="portal-flex portal-flex-col portal-gap-4"
         onSubmit={(event) => {
           void handleSubmit(event);
         }}
       >
-        <label>
+        <label className="portal-flex portal-flex-col portal-gap-1">
           Bio
-          <textarea value={bio} onChange={(event) => setBio(event.target.value)} />
+          <textarea style={fieldStyle} value={bio} onChange={(event) => setBio(event.target.value)} />
         </label>
-        <label>
+        <label className="portal-flex portal-flex-col portal-gap-1">
           Avatar URL
-          <input value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
+          <input style={fieldStyle} value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
         </label>
-        <button type="submit" disabled={status === "saving"}>
+        <button
+          type="submit"
+          disabled={status === "saving"}
+          style={{
+            background: "var(--portal-color-primary, #4338ca)",
+            color: "var(--portal-color-primary-contrast, #fff)",
+            border: "none",
+            borderRadius: "var(--portal-radius, 6px)",
+            padding: "var(--portal-space-2, 0.5rem)",
+          }}
+        >
           {status === "saving" ? "Saving…" : "Save"}
         </button>
       </form>

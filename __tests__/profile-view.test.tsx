@@ -12,6 +12,22 @@ async function flush(act: (callback: () => Promise<void>) => Promise<void>, time
 }
 
 describe("ProfileView", () => {
+  test("references the shared theme's tokens with the correct literal fallbacks", async () => {
+    // Not a DOM-rendering test — happy-dom's CSSStyleDeclaration silently
+    // drops any style value containing var(...), so this checks the
+    // component's own source text instead (same technique portal-frame.tsx's
+    // own token test uses).
+    const fs = await import("node:fs/promises");
+    const source = await fs.readFile(new URL("../src/profile-view.tsx", import.meta.url), "utf8");
+    expect(source).toContain("var(--portal-color-text, #1a1a1a)");
+    expect(source).toContain("var(--portal-color-danger, #b91c1c)");
+    expect(source).toContain("var(--portal-color-border, #ddd)");
+    expect(source).toContain("var(--portal-radius, 6px)");
+    expect(source).toContain("var(--portal-space-2, 0.5rem)");
+    expect(source).toContain("var(--portal-color-primary, #4338ca)");
+    expect(source).toContain("var(--portal-color-primary-contrast, #fff)");
+  });
+
   test("loads identity and profile data on mount and renders them", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async (input: any) => {
