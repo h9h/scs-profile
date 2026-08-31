@@ -134,4 +134,61 @@ describe("ProfileView", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test('publishes {displayName, avatarUrl} via usePublishContext("profile") only after both /me and /profile resolve', async () => {
+    const { __publishedValues, __resetPublishedValuesForTests } = await import("../src/portal-runtime-stub");
+    __resetPublishedValuesForTests();
+
+    const originalFetch = globalThis.fetch;
+    let resolveProfile: ((value: Response) => void) | null = null;
+    const profileGate = new Promise<Response>((resolve) => {
+      resolveProfile = resolve;
+    });
+    globalThis.fetch = mock(async (input: any) => {
+      const url = String(input);
+      if (url === "/me") {
+        return new Response(JSON.stringify({ displayName: "Ada Lovelace", email: null }), { status: 200 });
+      }
+      if (url === "/profile") {
+        return profileGate; // held open until the test releases it
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    try {
+      const { createRoot } = await import("react-dom/client");
+      const { act } = await import("react");
+      const { ProfileView } = await import("../src/profile-view");
+
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const root = createRoot(container);
+      await act(async () => {
+        root.render(<ProfileView />);
+      });
+      await flush(act);
+
+      // /me resolved, /profile still pending — must not have published yet
+      expect(__publishedValues).toEqual([]);
+
+      await act(async () => {
+        resolveProfile!(
+          new Response(JSON.stringify({ bio: "Mathematician", avatarUrl: "https://example.com/a.png" }), {
+            status: 200,
+          })
+        );
+      });
+      await flush(act);
+
+      expect(__publishedValues).toEqual([
+        { key: "profile", value: { displayName: "Ada Lovelace", avatarUrl: "https://example.com/a.png" } },
+      ]);
+
+      await act(async () => {
+        root.unmount();
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

@@ -13,6 +13,17 @@ export async function portalFetch(input: string, init?: RequestInit): Promise<Re
   return fetch(input, init);
 }
 
-export function usePublishContext(_key: string): (value: unknown) => void {
-  return () => {};
+// Test-only instrumentation (this file is never shipped — see the header
+// comment above): records every publish call so a test can assert what was
+// published and when, without needing the real Portal runtime.
+export const __publishedValues: { key: string; value: unknown }[] = [];
+
+export function usePublishContext(key: string): (value: unknown) => void {
+  return (value: unknown) => {
+    __publishedValues.push({ key, value });
+  };
+}
+
+export function __resetPublishedValuesForTests(): void {
+  __publishedValues.length = 0;
 }

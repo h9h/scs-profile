@@ -12,6 +12,7 @@ export function ProfileView() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [status, setStatus] = useState<Status>("loading");
+  const [saveError, setSaveError] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -42,6 +43,7 @@ export function ProfileView() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setStatus("saving");
+    setSaveError(false);
     try {
       const response = await portalFetch("/profile", {
         method: "POST",
@@ -49,14 +51,18 @@ export function ProfileView() {
         body: JSON.stringify({ bio, avatarUrl }),
       });
       if (!response.ok) {
-        setStatus("error");
+        setSaveError(true);
+        setStatus("ready");
         return;
       }
       const updated = (await response.json()) as Profile;
       setProfile(updated);
+      setBio(updated.bio ?? "");
+      setAvatarUrl(updated.avatarUrl ?? "");
       setStatus("ready");
     } catch {
-      setStatus("error");
+      setSaveError(true);
+      setStatus("ready");
     }
   }
 
@@ -66,6 +72,7 @@ export function ProfileView() {
   return (
     <div>
       <h1>{me?.displayName ?? me?.email ?? "Your profile"}</h1>
+      {saveError && <p>Could not save your changes. Please try again.</p>}
       <form
         onSubmit={(event) => {
           void handleSubmit(event);
