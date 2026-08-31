@@ -4,6 +4,14 @@ import { verifyInternalToken } from "./internal-token";
 import { manifest } from "./manifest";
 import { getProfileBundle } from "./bundle";
 
+// Every option here is resolved as `opts.x ?? <default>`: an explicit opt
+// always wins, so tests can inject config directly without touching the
+// global, leaky process.env. The real entrypoint (`import.meta.main` below)
+// passes no opts at all, so every value falls through to its env-var-backed
+// default — matching the `--env-file` convention Portal itself uses. `db`
+// is the one exception: it has no corresponding env var, since there's
+// nothing to configure other than "use a real file or don't" — omit it and
+// you get the real on-disk database `createDatabase()` opens by default.
 export type ServerOptions = {
   port?: number;
   db?: Database;
@@ -40,7 +48,7 @@ export function createServer(opts: ServerOptions = {}) {
     );
   }
   const db = opts.db ?? createDatabase();
-  const port = opts.port ?? 4001;
+  const port = opts.port ?? Number(process.env.PORT ?? 4001);
   const baseUrl = (opts.baseUrl ?? process.env.SCS_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, "");
 
   function requireInternalToken(req: Request): { sub: string; roles: string[] } | Response {
@@ -127,6 +135,6 @@ export function createServer(opts: ServerOptions = {}) {
 }
 
 if (import.meta.main) {
-  const server = createServer({ port: Number(process.env.PORT ?? 4001) });
+  const server = createServer();
   console.log(`scs-profile listening on ${server.url}`);
 }
