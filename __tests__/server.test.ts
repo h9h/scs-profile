@@ -237,3 +237,41 @@ describe("createServer construction", () => {
     }
   });
 });
+
+describe("configurable maxRequestBodySize", () => {
+  test("maxRequestBodySize opt rejects an oversized body with 413", async () => {
+    const limited = createServer({
+      port: 0,
+      db: createDatabase(":memory:"),
+      internalTokenSecret: SECRET,
+      maxRequestBodySize: 100,
+    });
+    try {
+      const response = await fetch(limited.url, { method: "POST", body: "x".repeat(200) });
+      expect(response.status).toBe(413);
+    } finally {
+      limited.stop();
+    }
+  });
+
+  test("falls back to MAX_REQUEST_BODY_SIZE when maxRequestBodySize isn't given", async () => {
+    const original = process.env.MAX_REQUEST_BODY_SIZE;
+    process.env.MAX_REQUEST_BODY_SIZE = "100";
+    try {
+      const limited = createServer({
+        port: 0,
+        db: createDatabase(":memory:"),
+        internalTokenSecret: SECRET,
+      });
+      try {
+        const response = await fetch(limited.url, { method: "POST", body: "x".repeat(200) });
+        expect(response.status).toBe(413);
+      } finally {
+        limited.stop();
+      }
+    } finally {
+      if (original === undefined) delete process.env.MAX_REQUEST_BODY_SIZE;
+      else process.env.MAX_REQUEST_BODY_SIZE = original;
+    }
+  });
+});

@@ -17,6 +17,7 @@ export type ServerOptions = {
   db?: Database;
   internalTokenSecret?: string;
   baseUrl?: string;
+  maxRequestBodySize?: number;
 };
 
 function json(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
@@ -50,6 +51,8 @@ export function createServer(opts: ServerOptions = {}) {
   const db = opts.db ?? createDatabase();
   const port = opts.port ?? Number(process.env.PORT ?? 4001);
   const baseUrl = (opts.baseUrl ?? process.env.SCS_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, "");
+  const maxRequestBodySize =
+    opts.maxRequestBodySize ?? Number(process.env.MAX_REQUEST_BODY_SIZE ?? 1024 * 1024);
 
   function requireInternalToken(req: Request): { sub: string; roles: string[] } | Response {
     const header = req.headers.get("Authorization");
@@ -72,8 +75,9 @@ export function createServer(opts: ServerOptions = {}) {
 
   return Bun.serve({
     port,
-    // 1MB is far more than a bio + an avatar URL should ever need.
-    maxRequestBodySize: 1024 * 1024,
+    // Defaults to 1MB, far more than a bio + an avatar URL should ever
+    // need; override via MAX_REQUEST_BODY_SIZE if that ever changes.
+    maxRequestBodySize,
     async fetch(req) {
       const url = new URL(req.url);
 
