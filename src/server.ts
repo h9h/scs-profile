@@ -4,14 +4,9 @@ import { verifyInternalToken } from "./internal-token";
 import { manifest } from "./manifest";
 import { getProfileBundle } from "./bundle";
 
-// Every option here is resolved as `opts.x ?? <default>`: an explicit opt
-// always wins, so tests can inject config directly without touching the
-// global, leaky process.env. The real entrypoint (`import.meta.main` below)
-// passes no opts at all, so every value falls through to its env-var-backed
-// default — matching the `--env-file` convention Portal itself uses. `db`
-// is the one exception: it has no corresponding env var, since there's
-// nothing to configure other than "use a real file or don't" — omit it and
-// you get the real on-disk database `createDatabase()` opens by default.
+// db is the one option below with no corresponding env var: there's nothing
+// to configure other than "use a real file or don't" — omit it and you get
+// the real on-disk database createDatabase() opens by default.
 export type ServerOptions = {
   port?: number;
   db?: Database;
@@ -75,8 +70,7 @@ export function createServer(opts: ServerOptions = {}) {
 
   return Bun.serve({
     port,
-    // Defaults to 1MB, far more than a bio + an avatar URL should ever
-    // need; override via MAX_REQUEST_BODY_SIZE if that ever changes.
+    // Far more than a bio + an avatar URL should ever need.
     maxRequestBodySize,
     async fetch(req) {
       const url = new URL(req.url);

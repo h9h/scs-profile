@@ -71,11 +71,15 @@ Matches Portal's own, for consistency and because this is meant to be read as a 
 
 ## Running it
 
-- Dev server on its own port (`4001` by default — override with `PORT`), configured the same `--env-file` way Portal itself is. Copy `.env.dev.example` to `.env.dev` and fill it in.
-- Requires `INTERNAL_TOKEN_SECRET` set to the *same* value Portal's own `INTERNAL_TOKEN_SECRET` is set to (they must match — this is the shared secret described above).
-- `SCS_BASE_URL` (optional, defaults to `http://localhost:<PORT>`) must exactly match whatever base URL Portal's own `PORTAL_SCS_URLS` registers this SCS under — Portal signs every internal token's audience claim to that exact string, and this SCS rejects any token whose audience doesn't match its own `SCS_BASE_URL` byte-for-byte (trailing slash, `127.0.0.1` vs `localhost`, a different port — any mismatch is a silent, undiagnosable-to-the-client 401 for every single request; check this SCS's own server logs, which do log a hint when this happens). Set it explicitly rather than relying on the default whenever the two sides might disagree.
-- To register it with a running Portal instance, add its base URL to Portal's own `PORTAL_SCS_URLS` env var (comma-separated, matching Portal's existing SCS-discovery mechanism — no new Portal-side work needed).
-- `MAX_REQUEST_BODY_SIZE` (optional, bytes, defaults to `1048576`/1MB — far more than a bio + an avatar URL should ever need) caps the inbound request body this SCS accepts; a larger body is rejected with `413` before any handler runs.
+Dev server on its own port (`4001` by default), configured the same
+`--env-file` way Portal itself is. Copy `.env.dev.example` to `.env.dev` and
+fill it in. For the full list of variables this SCS reads, their defaults,
+and a complete example `.env`, see
+[`docs/environment-configuration.md`](docs/environment-configuration.md) —
+in particular, `SCS_BASE_URL` must exactly match whatever base URL Portal's
+own `PORTAL_SCS_URLS` registers this SCS under, or every request fails with
+a silent, undiagnosable-to-the-client `401` (see that doc for why, and check
+this SCS's own server logs, which log a hint when it happens).
 
 ## Out of scope
 
