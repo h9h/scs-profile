@@ -30,7 +30,18 @@ export function createServer(opts: ServerOptions = {}) {
     const header = req.headers.get("Authorization");
     if (!header?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
     const payload = verifyInternalToken(header.slice("Bearer ".length), internalTokenSecret!, baseUrl);
-    if (!payload) return json({ error: "unauthorized" }, 401);
+    if (!payload) {
+      // The client only ever sees a bare 401 (no detail, by design — see
+      // specification.md) but a wrong SCS_BASE_URL/INTERNAL_TOKEN_SECRET
+      // rejects every single request with no clue why, so log a
+      // server-side hint pointing at the two things most likely wrong.
+      console.warn(
+        `rejected an internal token (bad signature, expired, or wrong audience). If this is unexpected, ` +
+          `confirm SCS_BASE_URL ("${baseUrl}") exactly matches how this SCS is registered in Portal's ` +
+          `PORTAL_SCS_URLS, and that INTERNAL_TOKEN_SECRET matches on both sides.`
+      );
+      return json({ error: "unauthorized" }, 401);
+    }
     return { sub: payload.sub, roles: payload.roles };
   }
 

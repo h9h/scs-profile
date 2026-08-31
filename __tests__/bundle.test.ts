@@ -10,6 +10,10 @@ describe("getProfileBundle", () => {
     expect(code).toMatch(/from\s*["']@portal\/runtime["']/);
     // react/jsx-runtime must be inlined, not left as an unresolvable bare specifier
     expect(code).not.toMatch(/from\s*["']react\/jsx-runtime["']/);
+    // The dev/test-only stub (src/portal-runtime-stub.ts) must never leak
+    // into the shipped bundle — only the real "@portal/runtime" bare
+    // specifier the browser resolves via Portal's own import map.
+    expect(code).not.toContain("__publishedValues");
   });
 
   test("memoizes the build across calls (returns the same string instance)", async () => {
