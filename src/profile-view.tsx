@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { portalFetch, usePublishContext } from "@portal/runtime";
 
 type Me = { displayName: string | null; email: string | null };
@@ -7,6 +7,13 @@ type Status = "loading" | "ready" | "saving" | "error";
 
 export function ProfileView() {
   const publishProfile = usePublishContext("profile");
+  // The real usePublishContext's returned function may not have a stable
+  // identity across renders (this component's own dev/test-only stub
+  // doesn't guarantee one either) — routing every call through a ref means
+  // the publish effect below only needs to depend on [me, profile], not on
+  // publishProfile itself, so it can't re-fire on every unrelated render.
+  const publishProfileRef = useRef(publishProfile);
+  publishProfileRef.current = publishProfile;
   const [me, setMe] = useState<Me | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bio, setBio] = useState("");
@@ -37,18 +44,27 @@ export function ProfileView() {
 
   useEffect(() => {
     if (!me || !profile) return;
-    publishProfile({ displayName: me.displayName, avatarUrl: profile.avatarUrl });
-  }, [me, profile, publishProfile]);
+    publishProfileRef.current({ displayName: me.displayName, avatarUrl: profile.avatarUrl });
+  }, [me, profile]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setStatus("saving");
     setSaveError(false);
     try {
+      // An empty field means "no bio"/"no avatar" — send null so it's
+      // actually cleared server-side (an empty string is a value, not the
+      // same as omitting/clearing the field; see specification.md, Data
+      // ownership). This also matters now that the server validates a
+      // non-null avatarUrl as a real http(s) URL — "" would fail that
+      // check.
       const response = await portalFetch("/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio, avatarUrl }),
+        body: JSON.stringify({
+          bio: bio === "" ? null : bio,
+          avatarUrl: avatarUrl === "" ? null : avatarUrl,
+        }),
       });
       if (!response.ok) {
         setSaveError(true);

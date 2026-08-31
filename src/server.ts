@@ -11,18 +11,35 @@ export type ServerOptions = {
   baseUrl?: string;
 };
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+function json(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...extraHeaders },
+  });
+}
+
+// Blocks a stored/published avatar URL from being anything other than a
+// real http(s) link — this string round-trips through GET /profile into
+// other SCSs via usePublishContext("profile"), so a scheme like
+// `javascript:` stored here would be a stored-XSS payload for any consumer
+// that ever rendered it as an href rather than an <img src>.
+function isValidAvatarUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 export function createServer(opts: ServerOptions = {}) {
-  const db = opts.db ?? createDatabase();
   const internalTokenSecret = opts.internalTokenSecret ?? process.env.INTERNAL_TOKEN_SECRET;
   if (!internalTokenSecret) {
     throw new Error(
       "INTERNAL_TOKEN_SECRET must be set (shared out-of-band with the Portal instance composing this SCS)"
     );
   }
+  const db = opts.db ?? createDatabase();
   const port = opts.port ?? 4001;
   const baseUrl = (opts.baseUrl ?? process.env.SCS_BASE_URL ?? `http://localhost:${port}`).replace(/\/+$/, "");
 
@@ -66,15 +83,17 @@ export function createServer(opts: ServerOptions = {}) {
         }
       }
 
-      if (url.pathname === "/profile" && req.method === "GET") {
-        const auth = requireInternalToken(req);
-        if (auth instanceof Response) return auth;
-        return json(getProfile(db, auth.sub));
-      }
+      if (url.pathname === "/profile") {
+        if (req.method !== "GET" && req.method !== "POST") {
+          return json({ error: "method not allowed" }, 405, { Allow: "GET, POST" });
+        }
 
-      if (url.pathname === "/profile" && req.method === "POST") {
         const auth = requireInternalToken(req);
         if (auth instanceof Response) return auth;
+
+        if (req.method === "GET") {
+          return json(getProfile(db, auth.sub));
+        }
 
         let body: unknown;
         try {
@@ -82,13 +101,17 @@ export function createServer(opts: ServerOptions = {}) {
         } catch {
           return json({ error: "invalid JSON body" }, 400);
         }
-        if (typeof body !== "object" || body === null) return json({ error: "invalid body" }, 400);
+        if (typeof body !== "object" || body === null || Array.isArray(body)) {
+          return json({ error: "invalid body" }, 400);
+        }
         const obj = body as Record<string, unknown>;
         if (obj.bio !== undefined && obj.bio !== null && typeof obj.bio !== "string") {
           return json({ error: "bio must be a string or null" }, 400);
         }
-        if (obj.avatarUrl !== undefined && obj.avatarUrl !== null && typeof obj.avatarUrl !== "string") {
-          return json({ error: "avatarUrl must be a string or null" }, 400);
+        if (obj.avatarUrl !== undefined && obj.avatarUrl !== null) {
+          if (typeof obj.avatarUrl !== "string" || !isValidAvatarUrl(obj.avatarUrl)) {
+            return json({ error: "avatarUrl must be a valid http(s) URL, or null" }, 400);
+          }
         }
 
         const updated = upsertProfile(db, auth.sub, {

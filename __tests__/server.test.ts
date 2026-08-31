@@ -85,6 +85,14 @@ describe("GET /profile", () => {
   });
 });
 
+describe("/profile with an unsupported method", () => {
+  test("returns 405 with an Allow header, not 404, even with no Authorization header", async () => {
+    const response = await fetch(`${requestUrl}/profile`, { method: "DELETE" });
+    expect(response.status).toBe(405);
+    expect(response.headers.get("Allow")).toBe("GET, POST");
+  });
+});
+
 describe("POST /profile", () => {
   test("returns 401 with no Authorization header", async () => {
     const response = await fetch(`${requestUrl}/profile`, { method: "POST", body: JSON.stringify({ bio: "hi" }) });
@@ -143,6 +151,56 @@ describe("POST /profile", () => {
       body: JSON.stringify({ bio: 42 }),
     });
     expect(response.status).toBe(400);
+  });
+
+  test("returns 400 when avatarUrl is present but not a string", async () => {
+    const token = makeToken("user-1", CONFIGURED_BASE_URL);
+    const response = await fetch(`${requestUrl}/profile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl: 42 }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test("returns 400 when avatarUrl is a non-http(s) URL (e.g. javascript:)", async () => {
+    const token = makeToken("user-1", CONFIGURED_BASE_URL);
+    const response = await fetch(`${requestUrl}/profile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl: "javascript:alert(1)" }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test("returns 400 when avatarUrl isn't a parseable URL at all", async () => {
+    const token = makeToken("user-1", CONFIGURED_BASE_URL);
+    const response = await fetch(`${requestUrl}/profile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl: "not a url" }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test("returns 400 for an array body", async () => {
+    const token = makeToken("user-1", CONFIGURED_BASE_URL);
+    const response = await fetch(`${requestUrl}/profile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify([]),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  test("accepts a valid https avatarUrl", async () => {
+    const token = makeToken("user-1", CONFIGURED_BASE_URL);
+    const response = await fetch(`${requestUrl}/profile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl: "https://example.com/a.png" }),
+    });
+    expect(response.status).toBe(200);
   });
 
   test("a partial update (only bio) leaves avatarUrl unchanged", async () => {

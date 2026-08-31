@@ -45,7 +45,7 @@ CREATE TABLE profiles (
 );
 ```
 
-`GET /profile` returns `{ bio: string | null, avatarUrl: string | null }` for the calling user — both `null` if no row exists yet (a brand-new user hasn't set anything). `POST /profile` accepts the same shape and upserts: a malformed body (not JSON, or `bio`/`avatarUrl` present but not `string | null`) is rejected with `400` before anything is written; either field may be omitted from the body entirely, in which case that column is left unchanged rather than nulled out.
+`GET /profile` returns `{ bio: string | null, avatarUrl: string | null }` for the calling user — both `null` if no row exists yet (a brand-new user hasn't set anything). `POST /profile` accepts the same shape and upserts: a malformed body (not JSON, an array, or `bio`/`avatarUrl` present but not `string | null`) is rejected with `400` before anything is written; either field may be omitted from the body entirely, in which case that column is left unchanged rather than nulled out. `avatarUrl`, when a non-null string, must additionally parse as a valid `http:`/`https:` URL — this value round-trips into other SCSs via `usePublishContext("profile")` (see below), so a scheme like `javascript:` is rejected rather than stored. A request whose method is neither `GET` nor `POST` gets `405` (with an `Allow: GET, POST` header), not `404`.
 
 ### Verifying the internal token
 

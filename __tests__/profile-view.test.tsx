@@ -262,4 +262,61 @@ describe("ProfileView", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test("clearing a field to empty and saving sends null for it, not an empty string", async () => {
+    const originalFetch = globalThis.fetch;
+    const postedBodies: string[] = [];
+    globalThis.fetch = mock(async (input: any, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/me") {
+        return new Response(JSON.stringify({ displayName: "Ada Lovelace", email: null }), { status: 200 });
+      }
+      if (url === "/profile" && init?.method === "POST") {
+        postedBodies.push(String(init.body));
+        return new Response(JSON.stringify({ bio: null, avatarUrl: "https://example.com/a.png" }), { status: 200 });
+      }
+      if (url === "/profile") {
+        return new Response(JSON.stringify({ bio: "Mathematician", avatarUrl: "https://example.com/a.png" }), {
+          status: 200,
+        });
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    try {
+      const { createRoot } = await import("react-dom/client");
+      const { act } = await import("react");
+      const { ProfileView } = await import("../src/profile-view");
+
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const root = createRoot(container);
+      await act(async () => {
+        root.render(<ProfileView />);
+      });
+      await flush(act);
+
+      const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+      await act(async () => {
+        nativeSetter.call(textarea, "");
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+
+      const form = container.querySelector("form") as HTMLFormElement;
+      await act(async () => {
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      });
+      await flush(act);
+
+      expect(postedBodies).toHaveLength(1);
+      expect(JSON.parse(postedBodies[0])).toEqual({ bio: null, avatarUrl: "https://example.com/a.png" });
+
+      await act(async () => {
+        root.unmount();
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

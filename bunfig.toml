@@ -3,10 +3,6 @@ jsxImportSource = "react"
 
 telemetry = false
 
-[serve]
-  port = 4001
-  hostname = "localhost"
-
 [test]
   framework = "bun:test"
   environment = "node"
